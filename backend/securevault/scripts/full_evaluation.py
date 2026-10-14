@@ -239,9 +239,9 @@ import os
 import subprocess
 
 # Generic API Key & Tokens (SEC003, SEC006, SEC008)
-api_key = "AIzaSyD9876543210ZYXWVUTSRQPONMLKJIHGF"
-github_token = "ghp_1234567890abcdefghijklmnopqrstuvwxyz"
-google_api_key = "AIzaSyDummyTestKeyExampleNotReal0000000"
+api_key = "example_generic_api_key_not_real_value"
+github_token = "example_github_token_dummy_string"
+google_api_key = "example_test_google_api_key_placeholder"
 
 # Debug mode in production (CODE015)
 DEBUG = True
@@ -428,8 +428,8 @@ import subprocess
 # Remediated: GitHub token removed (SEC006 fixed)
 github_token = os.getenv("GITHUB_TOKEN")
 # Still present for next phase: SEC003, SEC008
-api_key = "AIzaSyD9876543210ZYXWVUTSRQPONMLKJIHGF"
-google_api_key = "AIzaSyDummyTestKeyExampleNotReal0000000"
+api_key = "example_generic_api_key_not_real_value"
+google_api_key = "example_test_google_api_key_placeholder"
 
 DEBUG = True
 

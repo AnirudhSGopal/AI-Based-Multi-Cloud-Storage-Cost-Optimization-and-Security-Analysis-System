@@ -20,38 +20,57 @@ api.interceptors.request.use(
 
 let activeRefreshPromise = null
 
-async function requestTokenRefresh() {
-  if (!activeRefreshPromise) {
-    activeRefreshPromise = (async () => {
-      const refreshToken = localStorage.getItem('refresh_token')
-      if (!refreshToken) {
-        throw new Error('No refresh token available')
-      }
-
-      const response = await axios.post(
-        `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/v1/auth/refresh`,
-        {},
-        {
-          headers: {
-            Authorization: `Bearer ${refreshToken}`,
-          },
-        }
-      )
-
-      const { access_token, refresh_token: newRefreshToken } = response.data
-      if (!access_token) {
-        throw new Error('No access token returned from refresh')
-      }
-
-      localStorage.setItem('auth_token', access_token)
-      if (newRefreshToken) {
-        localStorage.setItem('refresh_token', newRefreshToken)
-      }
-      return access_token
-    })().finally(() => {
-      activeRefreshPromise = null
-    })
+async function performSingleRefresh() {
+  const refreshToken = localStorage.getItem('refresh_token')
+  if (!refreshToken) {
+    throw new Error('No refresh token available')
   }
+
+  const response = await axios.post(
+    `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/v1/auth/refresh`,
+    {},
+    {
+      headers: {
+        Authorization: `Bearer ${refreshToken}`,
+      },
+    }
+  )
+
+  const { access_token, refresh_token: newRefreshToken } = response.data
+  if (!access_token) {
+    throw new Error('No access token returned from refresh')
+  }
+
+  localStorage.setItem('auth_token', access_token)
+  if (newRefreshToken) {
+    localStorage.setItem('refresh_token', newRefreshToken)
+  }
+  return access_token
+}
+
+async function requestTokenRefresh() {
+  if (activeRefreshPromise) {
+    return activeRefreshPromise
+  }
+
+  activeRefreshPromise = (async () => {
+    const tokenBefore = localStorage.getItem('auth_token')
+
+    if (typeof navigator !== 'undefined' && navigator.locks?.request) {
+      return navigator.locks.request('cloudopt_token_refresh', async () => {
+        const tokenNow = localStorage.getItem('auth_token')
+        if (tokenNow && tokenNow !== tokenBefore) {
+          return tokenNow
+        }
+        return performSingleRefresh()
+      })
+    }
+
+    return performSingleRefresh()
+  })().finally(() => {
+    activeRefreshPromise = null
+  })
+
   return activeRefreshPromise
 }
 

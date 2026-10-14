@@ -183,6 +183,7 @@ def create_app(config_name: str = "development") -> Flask:
                 "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
             )
             response.headers["Referrer-Policy"] = "no-referrer"
+            response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
             if not app.config.get("DEBUG"):
                 response.headers["Strict-Transport-Security"] = (
                     "max-age=31536000; includeSubDomains"
@@ -204,14 +205,6 @@ def create_app(config_name: str = "development") -> Flask:
             return jsonify({"error": error.name}), error.code
         app.logger.error("Unhandled exception: %s", type(error).__name__)
         return jsonify({"error": "Internal server error"}), 500
-
-    @app.after_request
-    def set_security_headers(response):
-        response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["X-Frame-Options"] = "DENY"
-        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
-        return response
 
     # ── Blueprints ────────────────────────────────────────────────────────
     _register_blueprints(app)

@@ -7,7 +7,7 @@ services:
     plan: standard
     rootDir: backend/securevault
     buildCommand: pip install -r requirements.txt
-    preDeployCommand: flask db upgrade
+    preDeployCommand: DATABASE_URL=$MIGRATION_DATABASE_URL flask db upgrade
     startCommand: gunicorn wsgi:app --workers 3 --threads 2 --bind 0.0.0.0:$PORT --timeout 120 --access-logfile - --error-logfile -
     healthCheckPath: /health
     envVars:
@@ -45,6 +45,8 @@ envVarGroups:
       # External Supabase Postgres credentials (session pooler port 5432 or direct connection)
       - key: DATABASE_URL
         sync: false
+      - key: MIGRATION_DATABASE_URL
+        sync: false
       - key: REDIS_URL
         fromService:
           type: redis
@@ -62,3 +64,4 @@ envVarGroups:
         sync: false
       - key: GITHUB_TOKEN
         sync: false
+
