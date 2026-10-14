@@ -64,7 +64,13 @@ def seed_demo_accounts_for_user(user: User):
     print(f"[OK] Seeded AWS, GCP, and Azure accounts & metrics for user {user.email}")
 
 
-def seed_user(email: str, username: str, password: str = "anirudh@123"):
+def seed_user(email: str, username: str, password: str | None = None):
+    if not password:
+        password = os.getenv("DEMO_USER_PASSWORD")
+        if not password:
+            import secrets
+            password = secrets.token_urlsafe(16)
+            print(f"[*] Generated password for {email}: {password}")
     user = User.query.filter_by(email=email).first()
     if not user:
         # Check if username exists
@@ -75,7 +81,7 @@ def seed_user(email: str, username: str, password: str = "anirudh@123"):
         user = User(
             username=username,
             email=email,
-            role=RoleEnum.ADMIN,
+            role=RoleEnum.ANALYST,
             is_active=True,
         )
         user.password = password
@@ -84,7 +90,7 @@ def seed_user(email: str, username: str, password: str = "anirudh@123"):
         print(f"[OK] Created demo user: {email} (id={user.id})")
     else:
         user.password = password
-        user.role = RoleEnum.ADMIN
+        user.role = RoleEnum.ANALYST
         user.is_active = True
         db.session.commit()
         print(f"[OK] Updated demo user: {email} (id={user.id})")
@@ -97,8 +103,8 @@ def main():
     app = create_app("development")
     with app.app_context():
         # Create user for both anirudhsgopal18@gmai.com and anirudhsgopal18@gmail.com
-        seed_user("anirudhsgopal18@gmai.com", "anirudhsgopal18", "anirudh@123")
-        seed_user("anirudhsgopal18@gmail.com", "anirudh_gmail", "anirudh@123")
+        seed_user("anirudhsgopal18@gmai.com", "anirudhsgopal18")
+        seed_user("anirudhsgopal18@gmail.com", "anirudh_gmail")
         print("\nAll demo accounts and credentials are ready!")
 
 

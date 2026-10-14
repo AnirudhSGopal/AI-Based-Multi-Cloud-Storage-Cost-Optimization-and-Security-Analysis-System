@@ -1,8 +1,9 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, DollarSign, ShieldCheck, Lightbulb, Settings, Zap, LogOut, Shield } from 'lucide-react'
+import { LayoutDashboard, DollarSign, ShieldCheck, Lightbulb, Settings, Zap, LogOut, ChevronRight } from 'lucide-react'
 import useCloudStore from '../store/cloudStore'
 import useAuthStore from '../store/authStore'
 import toast from 'react-hot-toast'
+import Logo from './common/Logo'
 
 function LogoutButton() {
   const navigate = useNavigate()
@@ -52,27 +53,52 @@ export default function Sidebar() {
   const criticalCount = activeAlerts.filter(a => a.type === 'critical').length
 
   const navItems = [
-    { to: '/dashboard',       icon: LayoutDashboard, label: 'Dashboard'       },
-    { to: '/cost-analysis',   icon: DollarSign,      label: 'Cost Analysis'   },
+    { to: '/dashboard',       icon: LayoutDashboard, label: 'Dashboard' },
+    { to: '/cost-analysis',   icon: DollarSign,      label: 'Cost Analysis' },
     { to: '/security',        icon: ShieldCheck,     label: 'Security Audit',  badge: activeAlerts.length, badgeColor: criticalCount > 0 ? 'var(--red)' : 'var(--yellow)' },
     { to: '/recommendations', icon: Lightbulb,       label: 'Recommendations', badge: 6 },
-    { to: '/settings',        icon: Settings,        label: 'Settings'        },
+    { to: '/settings',        icon: Settings,        label: 'Settings' },
   ]
-
-  if (user?.role === 'admin') {
-    navItems.push({ to: '/admin', icon: Shield, label: 'Admin Panel' })
-  }
 
   return (
     <aside className="sidebar">
       <div className="sidebar-logo">
-        <div className="sidebar-logo-icon">
-          <Zap size={14} color="#fff" />
+        <Logo size="md" subText="FinOps & SecOps" />
+      </div>
+
+      <div style={{
+        padding: '10px 12px',
+        margin: '8px 10px 6px',
+        borderRadius: 8,
+        background: 'var(--bg-elevated, rgba(255,255,255,0.03))',
+        border: '1px solid var(--border)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+      }}>
+        <div style={{
+          width: 22, height: 22, borderRadius: 5,
+          background: 'linear-gradient(135deg, #2563eb, #38bdf8)',
+          color: '#fff', fontSize: 10, fontWeight: 800,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          flexShrink: 0
+        }}>
+          P
         </div>
-        <div>
-          <div className="sidebar-logo-name">CloudOpt</div>
-          <div className="sidebar-logo-sub">AI Cost &amp; Security</div>
+        <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            Production Cloud
+          </div>
+          <div style={{ fontSize: 9.5, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>
+            AWS · GCP · Azure
+          </div>
         </div>
+        <span style={{
+          width: 6, height: 6, borderRadius: '50%',
+          background: 'var(--green, #22c55e)',
+          boxShadow: '0 0 6px rgba(34,197,94,0.6)',
+          flexShrink: 0
+        }} title="3 providers live" />
       </div>
 
       <nav className="sidebar-nav">

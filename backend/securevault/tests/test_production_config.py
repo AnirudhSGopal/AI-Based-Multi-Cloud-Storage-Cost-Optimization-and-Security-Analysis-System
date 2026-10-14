@@ -9,6 +9,7 @@ REQUIRED_PRODUCTION_ENV = {
     "DATABASE_URL": "postgresql://user:password@db.example.test/app",
     "ENCRYPTION_KEY": "test-encryption-key",
     "CORS_ORIGINS": "https://app.example.test",
+    "REDIS_URL": "redis://localhost:6379/1",
 }
 
 

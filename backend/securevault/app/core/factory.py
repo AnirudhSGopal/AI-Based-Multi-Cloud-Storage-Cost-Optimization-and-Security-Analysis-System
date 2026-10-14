@@ -3,6 +3,7 @@ Application factory.
 Keeps the app creation separate from the module-level scope so that
 tests can spin up isolated instances.
 """
+import os
 from flask import Flask, jsonify
 from werkzeug.exceptions import HTTPException
 
@@ -38,8 +39,124 @@ def create_app(config_name: str = "development") -> Flask:
     limiter.init_app(app)
     _configure_celery(app)
 
+    # ── ProxyFix for real client IP behind reverse proxy ───────────────────
+    # Expected proxy chain in production:
+    # Client IP -> Ingress / Cloud Reverse Proxy (Render / AWS ALB, 1 hop) -> Gunicorn (Flask WSGI)
+    from werkzeug.middleware.proxy_fix import ProxyFix
+    proxy_hops = int(os.getenv("PROXY_FIX_HOPS", "1"))
+    if proxy_hops > 0:
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=proxy_hops, x_proto=proxy_hops)
+
+    @jwt.additional_claims_loader
+    def default_claims_callback(_identity):
+        return {"aud": "customer"}
+
+    # ── Global JWT user active status & session revocation enforcement ────
+    @jwt.token_in_blocklist_loader
+    def check_if_token_revoked(_jwt_header, jwt_data):
+        from flask import request
+        from app.models.user import User
+        from app.models.audit_log import UsedRefreshToken
+        from app.services.token_service import is_token_revoked
+        identity = jwt_data.get("sub")
+        if not identity:
+            return True
+        try:
+            # Enforce audience separation:
+            # Admin endpoints accept ONLY aud="admin"
+            # Customer endpoints accept ONLY aud="customer"
+            token_aud = jwt_data.get("aud")
+            is_admin_path = request.path.startswith("/api/v1/admin")
+            if is_admin_path and token_aud != "admin":
+                return True
+            if not is_admin_path and token_aud != "customer":
+                return True
+
+            user = db.session.get(User, int(identity))
+            if user is None or not user.is_active:
+                return True
+
+            # If refresh token, check if already used (token reuse detection)
+            jti = jwt_data.get("jti")
+            if jwt_data.get("type") == "refresh" and jti:
+                if UsedRefreshToken.query.filter_by(jti=jti).first() is not None:
+                    from app.services.token_service import revoke_user_sessions
+                    from app.services.audit_logger import record_audit_event, get_real_client_ip
+                    revoke_user_sessions(user.id)
+                    record_audit_event(
+                        event_type="auth.refresh_token_reuse",
+                        status="denied",
+                        actor_id=user.id,
+                        actor_email=user.email,
+                        ip_address=get_real_client_ip(),
+                        details={"jti": jti, "action": "revoke_all_sessions"},
+                    )
+                    return True
+
+            # Check revocation timestamp for all token types
+            if is_token_revoked(user.id, jwt_data):
+                return True
+            return False
+        except Exception:
+            # Fail closed on database errors or unexpected exceptions
+            return True
+
+    @jwt.revoked_token_loader
+    def custom_revoked_token_loader(_jwt_header, jwt_data):
+        from flask import request
+        if request.path.startswith("/api/v1/admin"):
+            return jsonify({"error": "Not found"}), 404
+        if jwt_data.get("type") == "refresh":
+            from app.models.audit_log import UsedRefreshToken
+            if UsedRefreshToken.query.filter_by(jti=jwt_data.get("jti")).first() is not None:
+                return jsonify({"error": "Invalid session. Token reuse detected. Please sign in again."}), 401
+            return jsonify({"error": "Session has been revoked. Please sign in again."}), 401
+        return jsonify({"error": "Account is disabled or session has been revoked."}), 403
+
+    @jwt.user_lookup_loader
+    def user_lookup_callback(_jwt_header, jwt_data):
+        from app.models.user import User
+        identity = jwt_data.get("sub")
+        if not identity:
+            return None
+        try:
+            user = db.session.get(User, int(identity))
+            if user is None or not user.is_active:
+                return None
+            return user
+        except Exception:
+            return None
+
+    @jwt.user_lookup_error_loader
+    def custom_user_lookup_error(_jwt_header, _jwt_data):
+        from flask import request
+        if request.path.startswith("/api/v1/admin"):
+            return jsonify({"error": "Not found"}), 404
+        return jsonify({"error": "Account is disabled or does not exist."}), 403
+
+    @jwt.expired_token_loader
+    def custom_expired_token_loader(_jwt_header, _jwt_data):
+        from flask import request
+        if request.path.startswith("/api/v1/admin"):
+            return jsonify({"error": "Not found"}), 404
+        return jsonify({"error": "Token has expired."}), 401
+
+    @jwt.invalid_token_loader
+    def custom_invalid_token_loader(error_string):
+        from flask import request
+        if request.path.startswith("/api/v1/admin"):
+            return jsonify({"error": "Not found"}), 404
+        return jsonify({"error": "Invalid token."}), 422
+
+    @jwt.unauthorized_loader
+    def custom_unauthorized_loader(error_string):
+        from flask import request
+        if request.path.startswith("/api/v1/admin"):
+            return jsonify({"error": "Not found"}), 404
+        return jsonify({"error": "Missing authorization header."}), 401
+
     with app.app_context():
-        from app.models import user, scan, cloud, cloud_account  # noqa: F401
+        from app.models import user, scan, cloud, cloud_account, audit_log  # noqa: F401
 
     # ── CORS Handling (manual) ────────────────────────────────────────────
     # Initialize CORS with Flask-CORS extension

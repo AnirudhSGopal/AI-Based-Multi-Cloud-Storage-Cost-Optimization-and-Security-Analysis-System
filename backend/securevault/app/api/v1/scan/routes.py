@@ -82,6 +82,26 @@ def start_scan():
     return jsonify({"scan": job.to_dict()}), 202
 
 
+@scan_bp.get("/latest")
+@jwt_required()
+@active_user_required
+def get_latest_scan():
+    user_id = int(get_jwt_identity())
+    job = (
+        ScanJob.query.filter_by(requested_by=user_id, status=ScanStatusEnum.COMPLETED)
+        .order_by(ScanJob.created_at.desc())
+        .first()
+    )
+    if job is None:
+        return jsonify({"scan": None}), 200
+
+    payload = {"scan": job.to_dict()}
+    if job.result is not None:
+        payload["result"] = job.result.to_dict()
+        payload["findings"] = [finding.to_dict() for finding in job.vulnerabilities]
+    return jsonify(payload), 200
+
+
 @scan_bp.get("/<int:job_id>")
 @jwt_required()
 @active_user_required

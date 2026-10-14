@@ -27,13 +27,15 @@ export default function Dashboard() {
     costError,
     fetchAccounts,
     syncAllAccounts,
+    fetchLatestScan,
   } = useCloudStore()
 
   useEffect(() => {
-    fetchAccounts().then(() => {
-      syncAllAccounts()
+    fetchAccounts().then((accountsList) => {
+      syncAllAccounts(accountsList)
     })
-  }, [fetchAccounts, syncAllAccounts])
+    fetchLatestScan()
+  }, [fetchAccounts, syncAllAccounts, fetchLatestScan])
 
   const activeAlerts = alerts.filter(a => !dismissedAlerts.includes(a.id))
   const criticalCount = activeAlerts.filter(a => a.type === 'critical').length

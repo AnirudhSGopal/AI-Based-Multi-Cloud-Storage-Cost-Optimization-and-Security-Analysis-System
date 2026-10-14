@@ -50,6 +50,25 @@ jobs:
       - name: Audit frontend dependencies
         run: npm audit --audit-level=high
 
+  admin-frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: admin-frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: admin-frontend/package-lock.json
+      - name: Install admin-frontend dependencies
+        run: npm ci
+      - name: Build admin-frontend
+        run: npm run build
+      - name: Audit admin-frontend dependencies
+        run: npm audit --audit-level=high
+
   production-migration:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest

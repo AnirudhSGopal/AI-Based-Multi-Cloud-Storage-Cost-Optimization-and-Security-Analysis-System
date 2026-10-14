@@ -21,7 +21,7 @@ export default function CostAnalysis() {
   const navigate = useNavigate()
 
   useEffect(() => {
-    fetchAccounts().then(() => syncAllAccounts())
+    fetchAccounts().then((accountsList) => syncAllAccounts(accountsList))
   }, [fetchAccounts, syncAllAccounts])
 
   // Process live cost data

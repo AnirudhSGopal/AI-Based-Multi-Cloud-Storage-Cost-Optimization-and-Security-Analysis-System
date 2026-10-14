@@ -1,15 +1,22 @@
 import { create } from 'zustand'
 import { apiClient } from '../services/api'
 
-const useAuthStore = create((set) => ({
+const initialToken = localStorage.getItem('auth_token') || null
+
+const useAuthStore = create((set, get) => ({
   user: null,
-  token: localStorage.getItem('auth_token') || null,
-  isAuthenticated: !!localStorage.getItem('auth_token'),
+  token: initialToken,
+  isAuthenticated: !!initialToken,
+  isInitialized: !initialToken, // Initialized immediately if no stored token, otherwise after fetchMe
   isLoading: false,
   error: null,
+  sessionExpiredMessage: null,
+
+  setSessionExpiredMessage: (msg) => set({ sessionExpiredMessage: msg }),
+  clearSessionExpiredMessage: () => set({ sessionExpiredMessage: null }),
 
   login: async (email, password) => {
-    set({ isLoading: true, error: null })
+    set({ isLoading: true, error: null, sessionExpiredMessage: null })
     try {
       const response = await apiClient.post('/api/v1/auth/login', {
         email,
@@ -22,6 +29,7 @@ const useAuthStore = create((set) => ({
         user,
         token: access_token,
         isAuthenticated: true,
+        isInitialized: true,
         isLoading: false,
       })
       return { success: true }
@@ -34,9 +42,8 @@ const useAuthStore = create((set) => ({
   },
 
   signup: async (firstName, lastName, email, password, provider = 'viewer') => {
-    set({ isLoading: true, error: null })
+    set({ isLoading: true, error: null, sessionExpiredMessage: null })
     try {
-      // Step 1: Register the account
       await apiClient.post('/api/v1/auth/register', {
         email,
         password,
@@ -44,7 +51,6 @@ const useAuthStore = create((set) => ({
         role: provider.toLowerCase(),
       })
 
-      // Step 2: Auto-login to get the access token (register doesn't return one)
       const loginResponse = await apiClient.post('/api/v1/auth/login', {
         email,
         password,
@@ -56,6 +62,7 @@ const useAuthStore = create((set) => ({
         user,
         token: access_token,
         isAuthenticated: true,
+        isInitialized: true,
         isLoading: false,
       })
       return { success: true }
@@ -71,10 +78,51 @@ const useAuthStore = create((set) => ({
     }
   },
 
-  logout: () => {
+  logout: (broadcast = true) => {
     localStorage.removeItem('auth_token')
     localStorage.removeItem('refresh_token')
-    set({ user: null, token: null, isAuthenticated: false })
+    localStorage.removeItem('cloudopt-state-store')
+    sessionStorage.clear()
+
+    if (window.__queryClient) {
+      window.__queryClient.clear()
+    }
+    if (window.__resetCloudStore) {
+      window.__resetCloudStore()
+    }
+
+    set({ user: null, token: null, isAuthenticated: false, isInitialized: true })
+
+    if (broadcast) {
+      try {
+        if (typeof BroadcastChannel !== 'undefined') {
+          const channel = new BroadcastChannel('cloudopt_auth_channel')
+          channel.postMessage({ type: 'LOGOUT', timestamp: Date.now() })
+          channel.close()
+        }
+      } catch {
+        // Fallback
+      }
+      try {
+        localStorage.setItem('cloudopt_logout_event', Date.now().toString())
+      } catch {
+        // ignore
+      }
+    }
+  },
+
+  checkSession: () => {
+    const token = localStorage.getItem('auth_token')
+    if (!token && get().isAuthenticated) {
+      get().logout(false)
+    }
+  },
+
+  handleSessionExpired: (returnTo) => {
+    get().logout(true)
+    set({ sessionExpiredMessage: 'Your session has expired. Please sign in again.' })
+    const target = returnTo ? `/login?returnTo=${encodeURIComponent(returnTo)}` : '/login'
+    window.location.replace(target)
   },
 
   clearError: () => {
@@ -83,20 +131,24 @@ const useAuthStore = create((set) => ({
 
   fetchMe: async () => {
     const token = localStorage.getItem('auth_token')
-    if (!token) return
+    if (!token) {
+      set({ user: null, isAuthenticated: false, isInitialized: true })
+      return
+    }
     try {
       const response = await apiClient.get('/api/v1/auth/me')
-      set({ user: response.data.user, isAuthenticated: true })
+      set({ user: response.data.user, isAuthenticated: true, isInitialized: true })
     } catch (error) {
-      if (error.response?.status === 401) {
+      if (error.response?.status === 401 || error.response?.status === 403) {
         localStorage.removeItem('auth_token')
         localStorage.removeItem('refresh_token')
-        set({ user: null, token: null, isAuthenticated: false })
+        localStorage.removeItem('cloudopt-state-store')
+        set({ user: null, token: null, isAuthenticated: false, isInitialized: true })
         return { success: false, error: 'Your session has expired. Please sign in again.' }
       }
-      const message = 'Unable to verify your session. Check your connection and retry.'
-      set({ error: message })
-      return { success: false, error: message }
+      // Network or other error - preserve session if token exists
+      set({ isInitialized: true })
+      return { success: false }
     }
   },
 }))

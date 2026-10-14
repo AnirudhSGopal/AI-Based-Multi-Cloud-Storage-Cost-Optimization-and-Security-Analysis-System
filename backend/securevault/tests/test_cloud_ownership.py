@@ -36,10 +36,10 @@ def test_user_cannot_read_or_delete_another_users_cloud_account():
     headers = {"Authorization": f"Bearer {token}"}
     client = app.test_client()
 
-    assert client.get(f"/api/v1/cloud/accounts/{account_id}", headers=headers).status_code == 403
+    assert client.get(f"/api/v1/cloud/accounts/{account_id}", headers=headers).status_code == 404
     assert client.delete(
         f"/api/v1/cloud/accounts/{account_id}", headers=headers
-    ).status_code == 403
+    ).status_code == 404
 
     with app.app_context():
         assert db.session.get(CloudAccount, account_id) is not None

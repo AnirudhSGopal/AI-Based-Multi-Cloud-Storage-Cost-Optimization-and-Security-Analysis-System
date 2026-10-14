@@ -11,7 +11,6 @@ const pageMeta = {
   '/security':        { title: 'Security Audit',  sub: 'Threats, compliance checks and active alerts' },
   '/recommendations': { title: 'Recommendations', sub: 'AI-powered cost and security optimizations' },
   '/settings':        { title: 'Settings',        sub: 'Cloud credentials and system preferences' },
-  '/admin':           { title: 'Admin Panel',     sub: 'User management, platform oversight and system health' },
 }
 
 export default function Navbar({ theme, toggleTheme }) {
@@ -33,7 +32,7 @@ export default function Navbar({ theme, toggleTheme }) {
   function handleLogout() {
     logout()
     toast.success('Logged out successfully')
-    navigate('/login')
+    navigate('/', { replace: true })
     setShowMenu(false)
   }
 
@@ -44,6 +43,27 @@ export default function Navbar({ theme, toggleTheme }) {
         {page.sub && <div className="navbar-sub">{page.sub}</div>}
       </div>
       <div className="navbar-actions">
+        {/* Real-time SaaS Status Badge */}
+        <div style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 6,
+          padding: '4px 10px',
+          borderRadius: 20,
+          background: 'var(--bg-elevated, rgba(255,255,255,0.04))',
+          border: '1px solid var(--border)',
+          fontSize: 11,
+          fontWeight: 600,
+          color: 'var(--text-secondary)'
+        }}>
+          <span style={{
+            width: 6, height: 6, borderRadius: '50%',
+            background: 'var(--green, #22c55e)',
+            boxShadow: '0 0 6px rgba(34,197,94,0.6)'
+          }} />
+          <span>Multi-Cloud Live</span>
+        </div>
+
         <button className="nav-icon-btn theme-toggle" onClick={toggleTheme} title="Toggle theme">
           {theme === 'dark' ? <Sun size={13} /> : <Moon size={13} />}
         </button>

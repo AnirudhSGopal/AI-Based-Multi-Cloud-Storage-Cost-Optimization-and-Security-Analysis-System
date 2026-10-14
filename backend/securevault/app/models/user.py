@@ -24,10 +24,12 @@ class User(db.Model):
     email      = db.Column(db.String(120), unique=True, nullable=False, index=True)
     _password  = db.Column("password_hash", db.String(256), nullable=False)
     role       = db.Column(db.Enum(RoleEnum, values_callable=lambda obj: [e.value for e in obj]), nullable=False, default=RoleEnum.VIEWER)
-    is_active  = db.Column(db.Boolean, nullable=False, default=True)
-    created_at = db.Column(db.DateTime(timezone=True),
+    is_active   = db.Column(db.Boolean, nullable=False, default=True)
+    totp_secret = db.Column(db.String(64), nullable=True)
+    totp_last_timestep = db.Column(db.BigInteger, nullable=True, default=0)
+    created_at  = db.Column(db.DateTime(timezone=True),
                            default=lambda: datetime.now(timezone.utc))
-    updated_at = db.Column(db.DateTime(timezone=True),
+    updated_at  = db.Column(db.DateTime(timezone=True),
                            default=lambda: datetime.now(timezone.utc),
                            onupdate=lambda: datetime.now(timezone.utc))
 
@@ -48,6 +50,32 @@ class User(db.Model):
 
     def verify_password(self, plaintext: str) -> bool:
         return check_password_hash(self._password, plaintext)
+
+    # ── TOTP MFA (RFC 6238 standard library implementation with replay prevention) ──
+    def verify_totp(self, code: str, window: int = 1) -> bool:
+        """Verify 6-digit TOTP code against user's secret, rejecting replayed timesteps."""
+        if not self.totp_secret or not code:
+            return False
+        import base64, hashlib, hmac, struct, time
+        try:
+            key = base64.b32decode(self.totp_secret.strip().upper(), casefold=True)
+            step = int(time.time() // 30)
+            for offset in range(-window, window + 1):
+                cur_step = step + offset
+                msg = struct.pack(">Q", cur_step)
+                h = hmac.new(key, msg, hashlib.sha1).digest()
+                offset_idx = h[19] & 15
+                code_int = (struct.unpack(">I", h[offset_idx:offset_idx + 4])[0] & 0x7fffffff) % 1000000
+                calc = str(code_int).zfill(6)
+                if hmac.compare_digest(calc, str(code).strip()):
+                    if self.totp_last_timestep and cur_step <= self.totp_last_timestep:
+                        logger.warning("Replayed TOTP token rejected for user_id=%s timestep=%d", self.id, cur_step)
+                        return False
+                    self.totp_last_timestep = cur_step
+                    return True
+        except Exception:
+            pass
+        return False
 
     # ── RBAC helpers ──────────────────────────────────────────────────────
     def has_role(self, *roles: RoleEnum) -> bool:

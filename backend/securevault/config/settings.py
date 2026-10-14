@@ -83,7 +83,9 @@ class BaseConfig:
     # ── JWT ───────────────────────────────────────────────────────────────
     JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", "development-only-jwt-secret")
     JWT_ACCESS_TOKEN_EXPIRES: timedelta = timedelta(hours=1)
-    JWT_REFRESH_TOKEN_EXPIRES: timedelta = timedelta(days=30)
+    JWT_REFRESH_TOKEN_EXPIRES: timedelta = timedelta(
+        days=int(os.getenv("JWT_REFRESH_TOKEN_EXPIRES_DAYS", "14"))
+    )
 
     # ── Celery / Redis ────────────────────────────────────────────────────
     CELERY_BROKER_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
@@ -108,12 +110,21 @@ class BaseConfig:
     RATELIMIT_STORAGE_URI: str = os.getenv("REDIS_URL", "redis://localhost:6379/1")
     RATELIMIT_DEFAULT: str = "200 per day;50 per hour"
 
+    # ── Demo Mode ─────────────────────────────────────────────────────────
+    ENABLE_DEMO_DATA: bool = os.getenv("ENABLE_DEMO_DATA", "false").lower() == "true"
+
     # ── CORS ──────────────────────────────────────────────────────────────
     CORS_ORIGINS: list = [
         origin.strip()
         for origin in os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")
         if origin.strip()
     ]
+    ADMIN_CORS_ORIGINS: list = [
+        origin.strip()
+        for origin in os.getenv("ADMIN_CORS_ORIGINS", "http://localhost:5174").split(",")
+        if origin.strip()
+    ]
+    ADMIN_IP_ALLOWLIST: str = os.getenv("ADMIN_IP_ALLOWLIST", "")
 
     ENCRYPTION_KEY: str = os.getenv("ENCRYPTION_KEY", os.getenv("CLOUD_ENCRYPTION_KEY", ""))
     GITHUB_TOKEN: str = os.getenv("GITHUB_TOKEN", "")
@@ -138,6 +149,7 @@ class BaseConfig:
 
 class DevelopmentConfig(BaseConfig):
     DEBUG = True
+    ENABLE_DEMO_DATA = os.getenv("ENABLE_DEMO_DATA", "true").lower() == "true"
     RATELIMIT_STORAGE_URI = os.getenv("RATELIMIT_STORAGE_URI", "memory://")
 
 
@@ -164,6 +176,8 @@ class ProductionConfig(BaseConfig):
         for origin in os.getenv("CORS_ORIGINS", "").split(",")
         if origin.strip()
     ]
+    RATELIMIT_STORAGE_URI: str = os.environ.get("REDIS_URL", "")
+    ENABLE_DEMO_DATA = False
     DEBUG = False
     PROPAGATE_EXCEPTIONS = False
 
@@ -175,6 +189,7 @@ class ProductionConfig(BaseConfig):
             "DATABASE_URL",
             "ENCRYPTION_KEY",
             "CORS_ORIGINS",
+            "REDIS_URL",
         )
         for variable in required_variables:
             if not os.environ.get(variable, "").strip():

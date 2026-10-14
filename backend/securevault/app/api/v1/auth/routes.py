@@ -22,7 +22,7 @@ auth_bp = Blueprint("auth", __name__)
 # ── Register ──────────────────────────────────────────────────────────────────
 
 @auth_bp.post("/register")
-@limiter.limit("100 per minute")
+@limiter.limit("10 per minute")
 def register():
     data = request.get_json(silent=True) or {}
     username = (data.get("username") or "").strip()
@@ -60,7 +60,7 @@ def register():
 # ── Login ─────────────────────────────────────────────────────────────────────
 
 @auth_bp.post("/login")
-@limiter.limit("100 per minute")
+@limiter.limit("10 per minute")
 def login():
     data = request.get_json(silent=True) or {}
     identifier = (data.get("username") or data.get("email") or "").strip()
@@ -69,38 +69,77 @@ def login():
     if not identifier or not password:
         return jsonify({"error": "username/email and password are required."}), 400
 
+    from datetime import datetime, timezone, timedelta
+    from app.models.audit_log import AuditLog
+    from app.services.audit_logger import record_audit_event, get_real_client_ip
+    client_ip = get_real_client_ip()
+
     user = (
         User.query.filter_by(username=identifier).first()
         or User.query.filter_by(email=identifier.lower()).first()
     )
 
-    # Auto-provision or update demo user if matching demo credentials
-    from app.services.cloud.demo_dataset import is_demo_user
-    if is_demo_user(identifier) or identifier.lower() in ("anirudhsgopal18", "anirudh"):
-        if password == "anirudh@123":
-            if user is None:
-                user = User(
-                    username="anirudhsgopal18",
-                    email="anirudhsgopal18@gmail.com",
-                    role=RoleEnum.ADMIN,
-                    is_active=True,
-                )
-                user.password = "anirudh@123"
-                db.session.add(user)
-                db.session.commit()
-            elif not user.verify_password("anirudh@123"):
-                user.password = "anirudh@123"
-                user.role = RoleEnum.ADMIN
-                db.session.commit()
+    # Per-account lockout check: 5 failed logins within 15 minutes
+    account_key = user.email if user else identifier.lower()
+    cutoff = datetime.now(timezone.utc) - timedelta(minutes=15)
+    latest_success = (
+        AuditLog.query.filter(
+            AuditLog.actor_email == account_key,
+            AuditLog.event_type == "auth.login_success",
+        )
+        .order_by(AuditLog.created_at.desc())
+        .first()
+    )
+    success_ts = latest_success.created_at if latest_success else cutoff
+    if success_ts.tzinfo is None:
+        success_ts = success_ts.replace(tzinfo=timezone.utc)
+    check_since = max(cutoff, success_ts)
+
+    failed_count = AuditLog.query.filter(
+        AuditLog.actor_email == account_key,
+        AuditLog.event_type == "auth.login_failed",
+        AuditLog.created_at >= check_since,
+    ).count()
+
+    if failed_count >= 5:
+        record_audit_event(
+            event_type="auth.account_locked",
+            status="denied",
+            actor_id=user.id if user else None,
+            actor_email=account_key,
+            actor_role=user.role.value if (user and hasattr(user.role, "value")) else "unknown",
+            ip_address=client_ip,
+            details={"reason": "too_many_failed_logins", "attempts": failed_count},
+        )
+        return jsonify({"error": "Too many failed login attempts. Account temporarily locked for 15 minutes."}), 429
 
     if user is None or not user.verify_password(password):
+        record_audit_event(
+            event_type="auth.login_failed",
+            status="denied",
+            actor_id=user.id if user else None,
+            actor_email=account_key,
+            actor_role=user.role.value if (user and hasattr(user.role, "value")) else "unknown",
+            ip_address=client_ip,
+            details={"reason": "invalid_credentials"},
+        )
         return jsonify({"error": "Invalid credentials."}), 401
+
     if not user.is_active:
         return jsonify({"error": "Account is disabled."}), 403
 
+    record_audit_event(
+        event_type="auth.login_success",
+        status="success",
+        actor_id=user.id,
+        actor_email=user.email,
+        actor_role=user.role.value if hasattr(user.role, "value") else str(user.role),
+        ip_address=client_ip,
+    )
+
     identity = str(user.id)
-    access_token  = create_access_token(identity=identity)
-    refresh_token = create_refresh_token(identity=identity)
+    access_token  = create_access_token(identity=identity, additional_claims={"aud": "customer"})
+    refresh_token = create_refresh_token(identity=identity, additional_claims={"aud": "customer"})
 
     return jsonify({
         "access_token":  access_token,
@@ -119,8 +158,43 @@ def refresh():
     if user is None or not user.is_active:
         return jsonify({"error": "User not found or inactive."}), 401
 
-    new_access = create_access_token(identity=str(user.id))
-    return jsonify({"access_token": new_access}), 200
+    from flask_jwt_extended import get_jwt
+    from app.services.token_service import is_token_revoked, revoke_user_sessions
+    from app.models.audit_log import UsedRefreshToken
+    from app.services.audit_logger import record_audit_event, get_real_client_ip
+
+    jwt_payload = get_jwt()
+    jti = jwt_payload.get("jti")
+    client_ip = get_real_client_ip()
+
+    if is_token_revoked(user_id):
+        return jsonify({"error": "Session has been revoked. Please sign in again."}), 401
+
+    # Refresh token reuse detection
+    if jti and UsedRefreshToken.query.filter_by(jti=jti).first() is not None:
+        revoke_user_sessions(user_id)
+        record_audit_event(
+            event_type="auth.refresh_token_reuse",
+            status="denied",
+            actor_id=user_id,
+            actor_email=user.email,
+            ip_address=client_ip,
+            details={"jti": jti, "action": "revoke_all_sessions"},
+        )
+        return jsonify({"error": "Invalid session. Token reuse detected. Please sign in again."}), 401
+
+    # Mark current refresh token as used
+    if jti:
+        used_token = UsedRefreshToken(jti=jti, user_id=user_id)
+        db.session.add(used_token)
+        db.session.commit()
+
+    new_access = create_access_token(identity=str(user.id), additional_claims={"aud": "customer"})
+    new_refresh = create_refresh_token(identity=str(user.id), additional_claims={"aud": "customer"})
+    return jsonify({
+        "access_token": new_access,
+        "refresh_token": new_refresh,
+    }), 200
 
 
 # ── Me ────────────────────────────────────────────────────────────────────────

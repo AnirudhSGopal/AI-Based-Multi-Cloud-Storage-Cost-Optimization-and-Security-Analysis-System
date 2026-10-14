@@ -19,6 +19,12 @@ from config.settings import PROVIDER_STORAGE_CAPACITY_GB, get_provider_storage_c
 DEMO_EMAILS = {"anirudhsgopal18@gmai.com", "anirudhsgopal18@gmail.com"}
 
 def is_demo_user(email: str) -> bool:
+    try:
+        from flask import current_app
+        if current_app and not current_app.config.get("ENABLE_DEMO_DATA", True):
+            return False
+    except Exception:
+        pass
     if not email:
         return False
     return email.strip().lower() in DEMO_EMAILS

@@ -26,10 +26,22 @@ def app():
 def test_demo_user_flow(app):
     client = app.test_client()
 
+    with app.app_context():
+        from app.models.user import User, RoleEnum
+        demo = User(
+            username="anirudhsgopal18",
+            email="anirudhsgopal18@gmai.com",
+            role=RoleEnum.ANALYST,
+            is_active=True,
+        )
+        demo.password = "demo-isolated-test-password-8877"
+        db.session.add(demo)
+        db.session.commit()
+
     print("=== 1. Testing Demo Login ===")
     res = client.post("/api/v1/auth/login", json={
         "email": "anirudhsgopal18@gmai.com",
-        "password": "anirudh@123"
+        "password": "demo-isolated-test-password-8877"
     })
     assert res.status_code == 200, f"Login failed: {res.get_json()}"
     data = res.get_json()

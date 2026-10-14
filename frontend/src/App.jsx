@@ -1,11 +1,12 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, Outlet } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'react-hot-toast'
 
 import useAuthStore from './store/authStore'
 import Sidebar from './components/Sidebar'
 import Navbar from './components/Navbar'
+import { ProtectedRoute, PublicOnlyRoute, RouteAccessibilityTracker } from './components/auth/AuthGuards'
 
 const Login = lazy(() => import('./pages/Login'))
 const LandingPage = lazy(() => import('./pages/LandingPage'))
@@ -14,7 +15,8 @@ const CostAnalysis = lazy(() => import('./pages/CostAnalysis'))
 const SecurityAudit = lazy(() => import('./pages/SecurityAudit'))
 const Recommendations = lazy(() => import('./pages/Recommendations'))
 const Settings = lazy(() => import('./pages/Settings'))
-const AdminPanel = lazy(() => import('./pages/AdminPanel'))
+const AdminApp = lazy(() => import('./admin/AdminApp'))
+const NotFound = lazy(() => import('./pages/NotFound'))
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -26,18 +28,9 @@ const queryClient = new QueryClient({
   },
 })
 
-// Private Route Component
-function PrivateRoute({ children }) {
-  const { isAuthenticated } = useAuthStore()
-  return isAuthenticated ? children : <Navigate to="/login" replace />
-}
-
-// Admin Route Component
-function AdminRoute({ children }) {
-  const { isAuthenticated, user } = useAuthStore()
-  if (!isAuthenticated) return <Navigate to="/login" replace />
-  if (user?.role !== 'admin') return <Navigate to="/dashboard" replace />
-  return children
+// Attach for logout cache clearing
+if (typeof window !== 'undefined') {
+  window.__queryClient = queryClient
 }
 
 function AppLayout({ theme, toggleTheme }) {
@@ -46,70 +39,24 @@ function AppLayout({ theme, toggleTheme }) {
       <Sidebar />
       <div className="main-content">
         <Navbar theme={theme} toggleTheme={toggleTheme} />
-        <div className="page-wrapper">
-          <Routes>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route
-              path="/dashboard"
-              element={
-                <PrivateRoute>
-                  <Dashboard />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/cost-analysis"
-              element={
-                <PrivateRoute>
-                  <CostAnalysis />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/security"
-              element={
-                <PrivateRoute>
-                  <SecurityAudit />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/recommendations"
-              element={
-                <PrivateRoute>
-                  <Recommendations />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/settings"
-              element={
-                <PrivateRoute>
-                  <Settings />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/admin"
-              element={
-                <AdminRoute>
-                  <AdminPanel />
-                </AdminRoute>
-              }
-            />
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
-          </Routes>
-        </div>
+        <main id="main-content" tabIndex="-1" className="page-wrapper">
+          <Outlet />
+        </main>
       </div>
     </div>
   )
 }
 
 function App() {
-  const { isAuthenticated, fetchMe } = useAuthStore()
-  const [theme, setTheme] = useState(
-    () => localStorage.getItem('theme') || 'dark'
-  )
+  const { fetchMe } = useAuthStore()
+  const [theme, setTheme] = useState(() => {
+    const saved = localStorage.getItem('theme')
+    if (saved === 'dark' || saved === 'light') return saved
+    if (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      return 'dark'
+    }
+    return 'light'
+  })
 
   useEffect(() => {
     fetchMe()
@@ -120,12 +67,55 @@ function App() {
     localStorage.setItem('theme', theme)
   }, [theme])
 
+  // Lifecycle & cross-tab auth synchronization
+  useEffect(() => {
+    const handlePageShow = () => {
+      useAuthStore.getState().checkSession()
+    }
+    const handlePopState = () => {
+      useAuthStore.getState().checkSession()
+    }
+    const handleStorage = (e) => {
+      if (e.key === 'cloudopt_logout_event' || e.key === 'auth_token') {
+        useAuthStore.getState().checkSession()
+      }
+    }
+
+    window.addEventListener('pageshow', handlePageShow)
+    window.addEventListener('popstate', handlePopState)
+    window.addEventListener('storage', handleStorage)
+
+    let channel
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        channel = new BroadcastChannel('cloudopt_auth_channel')
+        channel.onmessage = (event) => {
+          if (event.data?.type === 'LOGOUT') {
+            useAuthStore.getState().logout(false)
+          }
+        }
+      }
+    } catch {
+      // BroadcastChannel unsupported
+    }
+
+    return () => {
+      window.removeEventListener('pageshow', handlePageShow)
+      window.removeEventListener('popstate', handlePopState)
+      window.removeEventListener('storage', handleStorage)
+      if (channel) {
+        channel.close()
+      }
+    }
+  }, [])
+
   const toggleTheme = () =>
     setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))
 
   return (
     <QueryClientProvider client={queryClient}>
       <Router>
+        <RouteAccessibilityTracker />
         <Suspense
           fallback={
             <div className="page-content" role="status" aria-live="polite">
@@ -133,15 +123,36 @@ function App() {
             </div>
           }
         >
-          {isAuthenticated ? (
-            <AppLayout theme={theme} toggleTheme={toggleTheme} />
-          ) : (
-            <Routes>
-              <Route path="/" element={<LandingPage theme={theme} toggleTheme={toggleTheme} />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          )}
+          <Routes>
+            {/* Dedicated Admin Console Route */}
+            <Route path="/admin/*" element={<AdminApp />} />
+
+            {/* Landing page is always accessible to everyone */}
+            <Route
+              path="/"
+              element={<LandingPage theme={theme} toggleTheme={toggleTheme} />}
+            />
+
+            {/* Public-only routes: logged-in users redirected to /dashboard */}
+            <Route element={<PublicOnlyRoute />}>
+              <Route path="/login" element={<Login theme={theme} toggleTheme={toggleTheme} />} />
+              <Route path="/register" element={<Login theme={theme} toggleTheme={toggleTheme} />} />
+            </Route>
+
+            {/* Authenticated Tenant Customer Routes */}
+            <Route element={<ProtectedRoute />}>
+              <Route element={<AppLayout theme={theme} toggleTheme={toggleTheme} />}>
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/cost-analysis" element={<CostAnalysis />} />
+                <Route path="/security" element={<SecurityAudit />} />
+                <Route path="/recommendations" element={<Recommendations />} />
+                <Route path="/settings" element={<Settings />} />
+              </Route>
+            </Route>
+
+            {/* Catch-all 404 */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
         </Suspense>
         <Toaster
           position="top-right"

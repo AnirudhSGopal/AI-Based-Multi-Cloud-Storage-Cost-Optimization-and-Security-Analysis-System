@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { Shield, Coins, Cpu, Activity, ArrowRight, Sun, Moon, Lock, Cloud, Terminal, CheckCircle } from 'lucide-react'
+import useAuthStore from '../store/authStore'
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;500;600;700;800&family=Outfit:wght@300;400;500;600;700;800&display=swap');
@@ -274,6 +275,7 @@ const styles = `
 
 export default function LandingPage({ theme, toggleTheme }) {
   const navigate = useNavigate()
+  const { isAuthenticated, isInitialized } = useAuthStore()
 
   return (
     <>
@@ -308,9 +310,24 @@ export default function LandingPage({ theme, toggleTheme }) {
               >
                 {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
               </button>
-              <button className="lp-btn lp-btn-secondary" onClick={() => navigate('/login')}>
-                Sign In
-              </button>
+              {!isInitialized ? (
+                <div
+                  className="lp-btn lp-btn-secondary"
+                  style={{ width: 84, opacity: 0.6, pointerEvents: 'none' }}
+                  role="status"
+                  aria-label="Loading authentication status"
+                >
+                  ···
+                </div>
+              ) : isAuthenticated ? (
+                <button className="lp-btn lp-btn-secondary" onClick={() => navigate('/dashboard')}>
+                  Dashboard
+                </button>
+              ) : (
+                <button className="lp-btn lp-btn-secondary" onClick={() => navigate('/login')}>
+                  Sign In
+                </button>
+              )}
             </div>
           </div>
         </header>
@@ -330,10 +347,28 @@ export default function LandingPage({ theme, toggleTheme }) {
           </p>
 
           <div style={{ display: 'flex', gap: 14, justifyContent: 'center', marginBottom: 60 }}>
-            <button className="lp-btn lp-btn-primary" onClick={() => navigate('/login')}>
-              Get Started Free <ArrowRight size={15} />
-            </button>
-            <button className="lp-btn lp-btn-secondary" onClick={() => navigate('/login')}>
+            {!isInitialized ? (
+              <div
+                className="lp-btn lp-btn-primary"
+                style={{ width: 160, opacity: 0.6, pointerEvents: 'none' }}
+                role="status"
+                aria-label="Loading authentication status"
+              >
+                ···
+              </div>
+            ) : isAuthenticated ? (
+              <button className="lp-btn lp-btn-primary" onClick={() => navigate('/dashboard')}>
+                Go to Dashboard <ArrowRight size={15} />
+              </button>
+            ) : (
+              <button className="lp-btn lp-btn-primary" onClick={() => navigate('/login')}>
+                Get Started Free <ArrowRight size={15} />
+              </button>
+            )}
+            <button
+              className="lp-btn lp-btn-secondary"
+              onClick={() => navigate(isAuthenticated ? '/security' : '/login')}
+            >
               Deploy Scanner <Terminal size={14} />
             </button>
           </div>
@@ -406,8 +441,11 @@ export default function LandingPage({ theme, toggleTheme }) {
           <p className="lp-subtitle" style={{ marginBottom: 30 }}>
             Connect your cloud providers, scan your repositories, and reduce waste by up to 40% in your first month.
           </p>
-          <button className="lp-btn lp-btn-primary" onClick={() => navigate('/login')}>
-            Start Auditing Now <ArrowRight size={15} />
+          <button
+            className="lp-btn lp-btn-primary"
+            onClick={() => navigate(isAuthenticated ? '/dashboard' : '/login')}
+          >
+            {isAuthenticated ? 'Go to Dashboard' : 'Start Auditing Now'} <ArrowRight size={15} />
           </button>
         </section>
 

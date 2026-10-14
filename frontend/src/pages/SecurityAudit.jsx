@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { ShieldCheck, Lock, Upload, GitBranch, X, Loader2 } from 'lucide-react'
 import AlertBanner from '../components/security/AlertBanner'
 import useCloudStore from '../store/cloudStore'
@@ -20,8 +20,13 @@ export default function SecurityAudit() {
     scanError,
     setRepoUrl,
     startBackgroundScan,
+    fetchLatestScan,
     setError
   } = useCloudStore()
+
+  useEffect(() => {
+    fetchLatestScan()
+  }, [fetchLatestScan])
 
   const [repoUrlInput, setRepoUrlInput] = useState(storeRepoUrl || '')
   const [files, setFiles]               = useState([])
@@ -32,10 +37,10 @@ export default function SecurityAudit() {
 
   const activeOverall = {
     ...scanOverall,
-    score: null,
+    score: scanOverall?.score ?? null,
     icon: Lock,
     color: hasScanned ? 'var(--blue)' : 'var(--text-muted)',
-    status: hasScanned ? 'Partial assessment' : 'Not assessed',
+    status: hasScanned ? (scanOverall?.status || 'Assessment complete') : 'Not assessed',
   }
 
   // ── file handling ──────────────────────────────────────────────────────────

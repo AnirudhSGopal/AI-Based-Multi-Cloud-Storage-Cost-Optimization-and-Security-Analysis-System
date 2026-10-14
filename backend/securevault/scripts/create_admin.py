@@ -26,7 +26,9 @@ def seed_admin():
     app = create_app("development")
     with app.app_context():
         email = os.getenv("ADMIN_EMAIL", "admin@cloudopt.ai").strip().lower()
-        password = os.getenv("ADMIN_PASSWORD", "securepassword123")
+        password = os.getenv("ADMIN_PASSWORD")
+        if not password or not password.strip():
+            raise RuntimeError("ADMIN_PASSWORD environment variable is required to bootstrap or update the admin user.")
         username = os.getenv("ADMIN_USERNAME", "admin")
 
         user = User.query.filter_by(email=email).first()

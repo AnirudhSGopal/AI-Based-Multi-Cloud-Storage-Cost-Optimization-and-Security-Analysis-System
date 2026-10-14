@@ -142,8 +142,8 @@ const useCloudStore = create(
         }
       },
 
-      syncAllAccounts: async () => {
-        const { accounts } = get()
+      syncAllAccounts: async (customAccounts) => {
+        const accounts = customAccounts || get().accounts
         if (!accounts || accounts.length === 0) {
           set({ costData: [], resources: [], recommendations: [], dailyTrend: [], costError: '' })
           return
@@ -168,6 +168,17 @@ const useCloudStore = create(
           } catch (e) {
             const errStr = e.response?.data?.error || e.message
             errors.push(`${acc.provider.toUpperCase()}: ${errStr}`)
+          }
+        }
+
+        if (!latestTrend || latestTrend.length === 0) {
+          try {
+            const { data: trendData } = await cloudService.getChartTrend()
+            if (trendData?.trend && trendData.trend.length > 0) {
+              latestTrend = trendData.trend
+            }
+          } catch {
+            // ignore
           }
         }
 
@@ -209,6 +220,42 @@ const useCloudStore = create(
         progress: 0,
         scanError: ''
       }),
+
+      fetchLatestScan: async () => {
+        try {
+          const { data } = await apiClient.get('/api/v1/scan/latest')
+          if (data && data.scan && data.result) {
+            const rawFindings = data.findings || []
+            const alerts = rawFindings.map((finding) => ({
+              id: finding.id,
+              severity: ['critical', 'high'].includes(finding.severity)
+                ? 'critical'
+                : ['medium', 'low'].includes(finding.severity) ? 'warning' : 'info',
+              message: [finding.title, finding.description].filter(Boolean).join(': '),
+              location: finding.file_path
+                ? `${finding.file_path}${finding.line_number ? `:${finding.line_number}` : ''}`
+                : 'Repository',
+            }))
+            set({
+              alerts,
+              securityScore: data.result.security_score,
+              scanOverall: {
+                score: data.result.security_score,
+                status: 'Assessment complete',
+                totalFindings: data.result.total_findings,
+                filesScanned: data.result.files_scanned,
+                coverage: data.result.coverage,
+              },
+              scanCoverage: data.result.coverage,
+              scanTime: data.scan.finished_at || data.scan.created_at,
+              repoUrl: data.scan.repo_url,
+              hasScanned: true,
+            })
+          }
+        } catch {
+          // ignore
+        }
+      },
 
       startBackgroundScan: async (url, filesWithContent) => {
         set({ scanning: true, progress: 20, scanError: '' })
@@ -329,7 +376,36 @@ const useCloudStore = create(
           set({ scanError: detail, scanning: false, progress: 0 })
           console.warn('Security audit request failed')
         }
-      }
+      },
+
+      reset: () => {
+        set({
+          selectedProvider: 'all',
+          dateRange: '30d',
+          isLoading: false,
+          securityScore: null,
+          alerts: [],
+          dismissedAlerts: [],
+          scanOverall: null,
+          scanCoverage: null,
+          scanCompliance: null,
+          scanTime: null,
+          repoUrl: '',
+          hasScanned: false,
+          scanning: false,
+          progress: 0,
+          scanError: '',
+          accounts: [],
+          accountsError: '',
+          costData: [],
+          resources: [],
+          recommendations: [],
+          dailyTrend: [],
+          costLoading: false,
+          accountsLoading: false,
+          costError: '',
+        })
+      },
     }),
     {
       name: 'cloudopt-state-store',
@@ -365,5 +441,11 @@ const useCloudStore = create(
     }
   )
 )
+
+if (typeof window !== 'undefined') {
+  window.__resetCloudStore = () => {
+    useCloudStore.getState().reset?.()
+  }
+}
 
 export default useCloudStore

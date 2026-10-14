@@ -367,7 +367,7 @@ def _get_account_or_404(account_id: int) -> CloudAccount:
     if account is None:
         abort(404)
     if not user.is_admin() and account.user_id != user_id:
-        abort(403)
+        abort(404)
     return account
 
 
