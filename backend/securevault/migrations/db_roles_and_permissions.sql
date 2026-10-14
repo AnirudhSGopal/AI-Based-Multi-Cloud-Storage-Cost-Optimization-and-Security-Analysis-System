@@ -14,15 +14,19 @@
 --        Direct Connection (port 5432). DO NOT use Transaction Pooler (port 6543)
 --        for migrations or Celery task locks, as PgBouncer in transaction mode
 --        does not support prepared statements, LISTEN/NOTIFY, or advisory locks.
+--      - Supavisor Pooler Username Syntax:
+--        * Direct connection: cloudopt_app or cloudopt_owner
+--        * Supabase Pooler: <role>.<project-ref>
+--          e.g. postgresql://cloudopt_app.<project-ref>:<PASSWORD>@aws-0-<region>.pooler.supabase.com:5432/postgres
 --
 -- Execution Runbook:
 --   Step 1: Connect as database superuser / postgres admin in Supabase SQL Editor.
 --   Step 2: Replace '<OWNER_PASSWORD>' and '<APP_PASSWORD>' with secure secrets from Vault/KMS.
 --   Step 3: Run this script against your target database (staging/production).
 --   Step 4: Configure CI / migration runner env:
---           MIGRATION_DATABASE_URL=postgresql://cloudopt_owner:<OWNER_PASSWORD>@<host>:5432/<dbname>
+--           MIGRATION_DATABASE_URL=postgresql://cloudopt_owner.<ref>:<OWNER_PASSWORD>@<host>:5432/<dbname>
 --   Step 5: Configure application runtime web service env:
---           DATABASE_URL=postgresql://cloudopt_app:<APP_PASSWORD>@<host>:5432/<dbname>
+--           DATABASE_URL=postgresql://cloudopt_app.<ref>:<APP_PASSWORD>@<host>:5432/<dbname>
 -- ==============================================================================
 
 BEGIN;
@@ -39,24 +43,44 @@ BEGIN
 END
 $$;
 
--- 2. Schema Ownership and Usage
-ALTER SCHEMA public OWNER TO cloudopt_owner;
+-- 2. Schema Usage & Administrative Delegation
+-- Retain schema ownership with postgres; grant owner and app role usage.
 GRANT USAGE, CREATE ON SCHEMA public TO cloudopt_owner;
 GRANT USAGE ON SCHEMA public TO cloudopt_app;
+GRANT cloudopt_owner TO postgres;
 
--- 3. Revoke default public schema privileges from public role
+-- 3. Revoke default public schema creation from public role
 REVOKE CREATE ON SCHEMA public FROM PUBLIC;
 
--- 4. Transfer ownership of all existing tables and sequences to cloudopt_owner
+-- 4. Transfer ownership of application tables and sequences to cloudopt_owner
+-- (Restricted to CloudOpt app tables to avoid touching Supabase platform objects)
 DO $$
 DECLARE
-    r RECORD;
+    tbl TEXT;
+    seq TEXT;
+    app_tables TEXT[] := ARRAY[
+        'users',
+        'cloud_accounts',
+        'scan_jobs',
+        'scan_results',
+        'vulnerabilities',
+        'cloud_metrics',
+        'audit_logs',
+        'alembic_version'
+    ];
 BEGIN
-    FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = 'public') LOOP
-        EXECUTE format('ALTER TABLE public.%I OWNER TO cloudopt_owner;', r.tablename);
+    FOREACH tbl IN ARRAY app_tables LOOP
+        IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = tbl) THEN
+            EXECUTE format('ALTER TABLE public.%I OWNER TO cloudopt_owner;', tbl);
+        END IF;
     END LOOP;
-    FOR r IN (SELECT sequence_name FROM information_schema.sequences WHERE sequence_schema = 'public') LOOP
-        EXECUTE format('ALTER SEQUENCE public.%I OWNER TO cloudopt_owner;', r.sequence_name);
+
+    FOR seq IN (
+        SELECT sequence_name FROM information_schema.sequences
+        WHERE sequence_schema = 'public'
+          AND sequence_name ~* '^(users|cloud_accounts|scan_jobs|scan_results|vulnerabilities|cloud_metrics|audit_logs)_'
+    ) LOOP
+        EXECUTE format('ALTER SEQUENCE public.%I OWNER TO cloudopt_owner;', seq);
     END LOOP;
 END
 $$;

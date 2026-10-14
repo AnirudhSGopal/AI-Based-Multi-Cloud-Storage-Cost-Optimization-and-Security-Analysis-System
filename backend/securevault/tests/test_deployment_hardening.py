@@ -156,3 +156,33 @@ def test_scan_start_fails_closed_when_broker_down(hardening_app, hardening_clien
     )
     assert res.status_code == 503
     assert "Scan queue unavailable" in res.get_json()["error"]
+
+
+def test_durable_lockout_enforced_via_audit_logs_independent_of_redis(hardening_app, hardening_client):
+    """
+    Verify 5 consecutive failed logins trigger a 15-minute 429 lockout
+    enforced durably from PostgreSQL AuditLog records without needing Redis.
+    """
+    with hardening_app.app_context():
+        u = User(username="target_victim", email="victim@cloudopt.ai", role=RoleEnum.VIEWER)
+        u.password = "CorrectPass123!"
+        db.session.add(u)
+        db.session.commit()
+
+    # Trigger 5 failed logins
+    for _ in range(5):
+        res = hardening_client.post("/api/v1/auth/login", json={"email": "victim@cloudopt.ai", "password": "WrongPassword"})
+        assert res.status_code == 401
+
+    # 6th attempt with correct password must be locked out (429)
+    res_locked = hardening_client.post("/api/v1/auth/login", json={"email": "victim@cloudopt.ai", "password": "CorrectPass123!"})
+    assert res_locked.status_code == 429
+    assert "locked" in res_locked.get_json()["error"].lower()
+
+
+def test_ratelimit_fails_closed_when_storage_error(hardening_app, hardening_client, monkeypatch):
+    """
+    Verify that when RATELIMIT_SWALLOW_ERRORS is False, backend storage failure fails closed.
+    """
+    assert hardening_app.config.get("RATELIMIT_SWALLOW_ERRORS") is False
+

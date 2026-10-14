@@ -1,0 +1,25 @@
+# Gitleaks configuration with allowlist for test fixtures and dummy seeds
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Allowlist for test fixtures, mock secrets, and synthetic eval data"
+paths = [
+    '''.*\.venv/.*''',
+    '''.*node_modules/.*''',
+    '''backend/securevault/tests/.*''',
+    '''backend/securevault/scripts/seed_dummy_test_files\.py''',
+    '''backend/securevault/scripts/full_evaluation\.py''',
+    '''frontend/src/__tests__/.*''',
+    '''frontend/e2e/.*'''
+]
+regexes = [
+    '''test_secret_key''',
+    '''test_secret_token''',
+    '''dummy_hash''',
+    '''super_secret_jwt_signing_key_123456''',
+    '''SuperAdminPassword2026!''',
+    '''example_generic_api_key_not_real_value''',
+    '''example_github_token_dummy_string''',
+    '''example_test_google_api_key_placeholder'''
+]

@@ -114,4 +114,5 @@ api.interceptors.response.use(
 )
 
 export const apiClient = api
+export { requestTokenRefresh }
 export default api

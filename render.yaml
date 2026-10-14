@@ -31,8 +31,8 @@ services:
       - key: FLASK_ENV
         value: production
 
-  # ── 3. Managed Redis (Broker & Rate Limiter) ────────────────────────────────
-  - type: redis
+  # ── 3. Managed Key Value (Redis Broker & Rate Limiter) ───────────────────────
+  - type: keyvalue
     name: cloudopt-redis
     region: oregon
     plan: starter
@@ -49,16 +49,22 @@ envVarGroups:
         sync: false
       - key: REDIS_URL
         fromService:
-          type: redis
+          type: keyvalue
           name: cloudopt-redis
           property: connectionString
       - key: SECRET_KEY
-        generateValue: true
+        sync: false
       - key: JWT_SECRET_KEY
-        generateValue: true
+        sync: false
       - key: ENCRYPTION_KEY
         sync: false
       - key: CORS_ORIGINS
+        sync: false
+      - key: ADMIN_CORS_ORIGINS
+        sync: false
+      - key: PROXY_FIX_HOPS
+        value: "1"
+      - key: ADMIN_IP_ALLOWLIST
         sync: false
       - key: GEMINI_API_KEY
         sync: false

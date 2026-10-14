@@ -115,6 +115,7 @@ const useAuthStore = create((set, get) => ({
     const token = localStorage.getItem('auth_token')
     if (!token && get().isAuthenticated) {
       get().logout(false)
+      window.location.replace('/')
     }
   },
 

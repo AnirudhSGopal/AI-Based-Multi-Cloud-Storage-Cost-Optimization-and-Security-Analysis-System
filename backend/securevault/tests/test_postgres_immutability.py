@@ -66,3 +66,78 @@ def test_postgres_audit_log_append_only_trigger():
         assert check_res[1] is None, f"Expected actor_id to be NULL after user deletion, got {check_res[1]}"
         assert check_res[2] == "pg_immut_test@cloudopt.ai"
 
+
+@pytest.mark.skipif(not can_test_postgres, reason="TEST_DATABASE_URL (PostgreSQL) is not set; skipping live DB test")
+def test_postgres_anon_reads_nothing():
+    """Verify PostgREST anon role cannot select from application tables."""
+    engine = create_engine(PG_URL)
+    with engine.connect() as conn:
+        # Check if anon role exists
+        has_anon = conn.execute(text("SELECT 1 FROM pg_roles WHERE rolname='anon'")).scalar()
+        if not has_anon:
+            pytest.skip("anon role not configured on test Postgres instance")
+
+        # Test selecting under anon role
+        blocked = False
+        try:
+            conn.execute(text("SET ROLE anon; SELECT * FROM users; RESET ROLE;"))
+        except Exception:
+            conn.rollback()
+            blocked = True
+        assert blocked, "anon role must be prohibited from reading users"
+
+
+@pytest.mark.skipif(not can_test_postgres, reason="TEST_DATABASE_URL (PostgreSQL) is not set; skipping live DB test")
+def test_postgres_cloudopt_app_cannot_update_delete_truncate_audit_logs():
+    """Verify cloudopt_app role cannot UPDATE, DELETE, or TRUNCATE audit_logs."""
+    engine = create_engine(PG_URL)
+    with engine.connect() as conn:
+        has_role = conn.execute(text("SELECT 1 FROM pg_roles WHERE rolname='cloudopt_app'")).scalar()
+        if not has_role:
+            pytest.skip("cloudopt_app role not configured on test Postgres instance")
+
+        # Test UPDATE
+        update_blocked = False
+        try:
+            conn.execute(text("SET ROLE cloudopt_app; UPDATE audit_logs SET status='fail'; RESET ROLE;"))
+        except Exception:
+            conn.rollback()
+            update_blocked = True
+        assert update_blocked, "cloudopt_app must not have UPDATE permission on audit_logs"
+
+        # Test DELETE
+        delete_blocked = False
+        try:
+            conn.execute(text("SET ROLE cloudopt_app; DELETE FROM audit_logs; RESET ROLE;"))
+        except Exception:
+            conn.rollback()
+            delete_blocked = True
+        assert delete_blocked, "cloudopt_app must not have DELETE permission on audit_logs"
+
+        # Test TRUNCATE
+        truncate_blocked = False
+        try:
+            conn.execute(text("SET ROLE cloudopt_app; TRUNCATE TABLE audit_logs; RESET ROLE;"))
+        except Exception:
+            conn.rollback()
+            truncate_blocked = True
+        assert truncate_blocked, "cloudopt_app must not have TRUNCATE permission on audit_logs"
+
+
+@pytest.mark.skipif(not can_test_postgres, reason="TEST_DATABASE_URL (PostgreSQL) is not set; skipping live DB test")
+def test_postgres_app_works_as_cloudopt_app():
+    """Verify cloudopt_app has functional SELECT/INSERT permissions on app tables."""
+    engine = create_engine(PG_URL)
+    with engine.connect() as conn:
+        has_role = conn.execute(text("SELECT 1 FROM pg_roles WHERE rolname='cloudopt_app'")).scalar()
+        if not has_role:
+            pytest.skip("cloudopt_app role not configured on test Postgres instance")
+
+        conn.execute(text("""
+            SET ROLE cloudopt_app;
+            SELECT count(*) FROM users;
+            SELECT count(*) FROM audit_logs;
+            RESET ROLE;
+        """))
+
+

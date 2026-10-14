@@ -10,6 +10,17 @@ permissions:
   contents: read
 
 jobs:
+  gitleaks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: .gitleaks.toml
+
   backend:
     runs-on: ubuntu-latest
     services:
@@ -38,6 +49,8 @@ jobs:
           cache-dependency-path: backend/securevault/requirements-dev.txt
       - name: Install backend and CI dependencies
         run: python -m pip install -r requirements-dev.txt
+      - name: Verify Row Level Security (RLS) policies
+        run: python scripts/check_rls_enabled.py
       - name: Run backend tests
         env:
           TEST_DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5432/cloudopt_test
@@ -61,6 +74,12 @@ jobs:
         run: npm ci
       - name: Lint frontend
         run: npm run lint
+      - name: Run unit tests
+        run: npm run test
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+      - name: Run Playwright e2e tests
+        run: npm run test:e2e
       - name: Build frontend
         run: npm run build
       - name: Audit frontend dependencies
@@ -109,6 +128,6 @@ jobs:
           SECRET_KEY: ${{ secrets.SECRET_KEY }}
           JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
           ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_URL: ${{ secrets.MIGRATION_DATABASE_URL }}
           CORS_ORIGINS: ${{ vars.CORS_ORIGINS }}
         run: flask --app wsgi:app db upgrade

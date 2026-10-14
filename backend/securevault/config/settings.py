@@ -110,6 +110,7 @@ class BaseConfig:
     # ── Rate limiting ─────────────────────────────────────────────────────
     RATELIMIT_STORAGE_URI: str = os.getenv("REDIS_URL", "redis://localhost:6379/1")
     RATELIMIT_DEFAULT: str = "200 per day;50 per hour"
+    RATELIMIT_SWALLOW_ERRORS: bool = False
 
     # ── Demo Mode ─────────────────────────────────────────────────────────
     ENABLE_DEMO_DATA: bool = os.getenv("ENABLE_DEMO_DATA", "false").lower() == "true"
