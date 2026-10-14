@@ -84,6 +84,7 @@ def start_scan():
 
 @scan_bp.get("/latest")
 @jwt_required()
+@limiter.limit("60 per minute")
 @active_user_required
 def get_latest_scan():
     user_id = int(get_jwt_identity())
@@ -104,6 +105,7 @@ def get_latest_scan():
 
 @scan_bp.get("/<int:job_id>")
 @jwt_required()
+@limiter.limit("60 per minute")
 @active_user_required
 def get_scan_status(job_id: int):
     job = _get_owned_job(job_id)
@@ -119,6 +121,7 @@ def get_scan_status(job_id: int):
 
 @scan_bp.delete("/<int:job_id>")
 @jwt_required()
+@limiter.limit("10 per minute")
 @active_user_required
 def cancel_scan(job_id: int):
     job = _get_owned_job(job_id)

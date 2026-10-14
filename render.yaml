@@ -1,0 +1,64 @@
+services:
+  # ── 1. Web API Service (Flask + Gunicorn) ───────────────────────────────────
+  - type: web
+    name: cloudopt-api
+    runtime: python
+    region: oregon
+    plan: standard
+    rootDir: backend/securevault
+    buildCommand: pip install -r requirements.txt
+    preDeployCommand: flask db upgrade
+    startCommand: gunicorn wsgi:app --workers 3 --threads 2 --bind 0.0.0.0:$PORT --timeout 120 --access-logfile - --error-logfile -
+    healthCheckPath: /health
+    envVars:
+      - fromGroup: cloudopt-shared-env
+      - key: FLASK_ENV
+        value: production
+      - key: PORT
+        value: 10000
+
+  # ── 2. Background Security Scanner Worker (Celery) ──────────────────────────
+  - type: worker
+    name: cloudopt-scan-worker
+    runtime: python
+    region: oregon
+    plan: standard
+    rootDir: backend/securevault
+    buildCommand: pip install -r requirements.txt
+    startCommand: celery -A app.core.celery_app worker --loglevel=INFO --concurrency=2
+    envVars:
+      - fromGroup: cloudopt-shared-env
+      - key: FLASK_ENV
+        value: production
+
+  # ── 3. Managed Redis (Broker & Rate Limiter) ────────────────────────────────
+  - type: redis
+    name: cloudopt-redis
+    region: oregon
+    plan: starter
+    maxmemoryPolicy: volatile-lru
+    ipAllowList: [] # internal Render network only
+
+envVarGroups:
+  - name: cloudopt-shared-env
+    envVars:
+      # External Supabase Postgres credentials (session pooler port 5432 or direct connection)
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: cloudopt-redis
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: ENCRYPTION_KEY
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GITHUB_TOKEN
+        sync: false

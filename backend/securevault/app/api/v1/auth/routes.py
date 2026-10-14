@@ -151,6 +151,7 @@ def login():
 # ── Refresh ───────────────────────────────────────────────────────────────────
 
 @auth_bp.post("/refresh")
+@limiter.limit("30 per minute")
 @jwt_required(refresh=True)
 def refresh():
     user_id = int(get_jwt_identity())
@@ -200,6 +201,7 @@ def refresh():
 # ── Me ────────────────────────────────────────────────────────────────────────
 
 @auth_bp.get("/me")
+@limiter.limit("120 per minute")
 @jwt_required()
 def me():
     user_id = int(get_jwt_identity())
@@ -209,11 +211,13 @@ def me():
     return jsonify({"user": user.to_dict()}), 200
 
 
-# ── Logout (client-side token discard) ────────────────────────────────────────
+# ── Logout ────────────────────────────────────────────────────────────────────
 
 @auth_bp.post("/logout")
+@limiter.limit("30 per minute")
 @jwt_required()
 def logout():
-    # Stateless JWT — instruct the client to discard the token.
-    # For server-side revocation, integrate a token blocklist (Redis) here.
-    return jsonify({"message": "Logged out. Discard your tokens on the client."}), 200
+    user_id = int(get_jwt_identity())
+    from app.services.token_service import revoke_user_sessions
+    revoke_user_sessions(user_id)
+    return jsonify({"message": "Successfully logged out and revoked active sessions."}), 200
