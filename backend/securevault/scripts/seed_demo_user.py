@@ -1,5 +1,5 @@
 """
-Seed / ensure demo user in database with password anirudh@123 and connected AWS, GCP, Azure accounts.
+Seed / ensure demo user in database with DEMO_USER_PASSWORD and connected AWS, GCP, Azure accounts.
 Usage:
     python scripts/seed_demo_user.py
 """

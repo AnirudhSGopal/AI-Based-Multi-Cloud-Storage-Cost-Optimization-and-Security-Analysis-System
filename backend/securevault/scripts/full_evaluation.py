@@ -241,7 +241,7 @@ import subprocess
 # Generic API Key & Tokens (SEC003, SEC006, SEC008)
 api_key = "AIzaSyD9876543210ZYXWVUTSRQPONMLKJIHGF"
 github_token = "ghp_1234567890abcdefghijklmnopqrstuvwxyz"
-google_api_key = "AIzaSyCnnXP2dmI0k7JxM9HPFvoRkzJX4R2Jylc"
+google_api_key = "AIzaSyDummyTestKeyExampleNotReal0000000"
 
 # Debug mode in production (CODE015)
 DEBUG = True
@@ -429,7 +429,7 @@ import subprocess
 github_token = os.getenv("GITHUB_TOKEN")
 # Still present for next phase: SEC003, SEC008
 api_key = "AIzaSyD9876543210ZYXWVUTSRQPONMLKJIHGF"
-google_api_key = "AIzaSyCnnXP2dmI0k7JxM9HPFvoRkzJX4R2Jylc"
+google_api_key = "AIzaSyDummyTestKeyExampleNotReal0000000"
 
 DEBUG = True
 

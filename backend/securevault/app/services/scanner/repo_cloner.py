@@ -51,8 +51,12 @@ def cloned_repo(repo_url: str, branch: str = "main") -> Generator[str, None, Non
     base_dir.mkdir(parents=True, exist_ok=True)
     clone_dir = Path(tempfile.mkdtemp(dir=base_dir, prefix="sv_")).resolve()
 
+    clone_env = {
+        "GIT_TERMINAL_PROMPT": "0",
+        "GIT_ALLOW_PROTOCOL": "https",
+        "GIT_CONFIG_NOSYSTEM": "1",
+    }
     github_token = current_app.config.get("GITHUB_TOKEN")
-    clone_env = {"GIT_TERMINAL_PROMPT": "0"}
     if github_token and github_token.strip() and github_token.strip() != "your_github_token_here":
         basic_auth = base64.b64encode(
             f"x-access-token:{github_token.strip()}".encode("utf-8")
@@ -71,6 +75,7 @@ def cloned_repo(repo_url: str, branch: str = "main") -> Generator[str, None, Non
             depth=1,
             branch=safe_branch,
             env=clone_env,
+            multi_options=["--config", "core.hooksPath=/dev/null", "--no-recurse-submodules"],
         )
         _check_size(str(clone_dir))
         yield str(clone_dir)

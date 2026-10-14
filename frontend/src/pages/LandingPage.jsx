@@ -393,9 +393,9 @@ export default function LandingPage({ theme, toggleTheme }) {
                 <div className="lp-mock-pill" style={{ background: 'rgba(16,185,129,0.1)', color: 'var(--lp-green)' }}>42% savings</div>
               </div>
               <div className="lp-mock-card">
-                <span className="lp-mock-label">ACTIVE ALERTS RESOLVED</span>
-                <div className="lp-mock-val" style={{ color: 'var(--lp-purple)' }}>99.4%</div>
-                <div className="lp-mock-pill" style={{ background: 'rgba(139,92,246,0.1)', color: 'var(--lp-purple)' }}>Auto-Remediated</div>
+                <span className="lp-mock-label">REMEDIATION PLAYBOOKS</span>
+                <div className="lp-mock-val" style={{ color: 'var(--lp-purple)' }}>CLI & Cloud</div>
+                <div className="lp-mock-pill" style={{ background: 'rgba(139,92,246,0.1)', color: 'var(--lp-purple)' }}>Automated Fixes</div>
               </div>
             </div>
           </div>
@@ -411,7 +411,7 @@ export default function LandingPage({ theme, toggleTheme }) {
               </div>
               <h3 className="lp-feat-title">AI Security Audit</h3>
               <p className="lp-feat-desc">
-                Automatically scans repository folders and codes recursively. Detects hardcoded secrets, misconfigurations, and vulnerabilities with zero false positives.
+                Automatically scans repository folders and codebases recursively. Detects hardcoded secrets, misconfigurations, and vulnerabilities with high precision.
               </p>
             </div>
             <div className="lp-feat-card">
@@ -451,7 +451,7 @@ export default function LandingPage({ theme, toggleTheme }) {
 
         {/* Footer */}
         <footer className="lp-footer">
-          <div>© {new Date().getFullYear()} CloudOpt Inc. All rights reserved. SOC 2 Type II Certified · GDPR Compliant.</div>
+          <div>© {new Date().getFullYear()} CloudOpt Inc. All rights reserved. End-to-End Encrypted · Tenant Isolated.</div>
         </footer>
       </div>
     </>

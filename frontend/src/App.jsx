@@ -15,7 +15,6 @@ const CostAnalysis = lazy(() => import('./pages/CostAnalysis'))
 const SecurityAudit = lazy(() => import('./pages/SecurityAudit'))
 const Recommendations = lazy(() => import('./pages/Recommendations'))
 const Settings = lazy(() => import('./pages/Settings'))
-const AdminApp = lazy(() => import('./admin/AdminApp'))
 const NotFound = lazy(() => import('./pages/NotFound'))
 
 const queryClient = new QueryClient({
@@ -124,9 +123,6 @@ function App() {
           }
         >
           <Routes>
-            {/* Dedicated Admin Console Route */}
-            <Route path="/admin/*" element={<AdminApp />} />
-
             {/* Landing page is always accessible to everyone */}
             <Route
               path="/"

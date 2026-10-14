@@ -340,12 +340,12 @@ export default function Login({ theme: propTheme, toggleTheme: propToggleTheme }
           }}
         >
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-            <ShieldCheck size={13} color="var(--color-success)" /> SOC 2 Type II
+            <ShieldCheck size={13} color="var(--color-success)" /> Fernet Encrypted
           </span>
           <span>•</span>
           <span>256-Bit TLS</span>
           <span>•</span>
-          <span>ISO 27001</span>
+          <span>Tenant Isolated</span>
         </div>
       </div>
 

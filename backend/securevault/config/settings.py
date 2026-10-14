@@ -68,6 +68,7 @@ class BaseConfig:
     SECRET_KEY: str = os.getenv("SECRET_KEY", "development-only-secret")
     DEBUG: bool = False
     TESTING: bool = False
+    ENABLE_DEMO_DATA: bool = False
 
     # ── Database ──────────────────────────────────────────────────────────
     SQLALCHEMY_DATABASE_URI: str = _get_database_uri()

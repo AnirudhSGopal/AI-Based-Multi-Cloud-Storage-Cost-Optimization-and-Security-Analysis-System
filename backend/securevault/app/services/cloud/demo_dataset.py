@@ -21,7 +21,7 @@ DEMO_EMAILS = {"anirudhsgopal18@gmai.com", "anirudhsgopal18@gmail.com"}
 def is_demo_user(email: str) -> bool:
     try:
         from flask import current_app
-        if current_app and not current_app.config.get("ENABLE_DEMO_DATA", True):
+        if current_app and not current_app.config.get("ENABLE_DEMO_DATA", False):
             return False
     except Exception:
         pass
