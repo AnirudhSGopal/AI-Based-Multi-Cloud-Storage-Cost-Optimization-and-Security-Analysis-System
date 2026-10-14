@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import useAuthStore from '../store/authStore'
 import { getSafeReturnTo } from '../utils/navigation'
@@ -7,7 +7,6 @@ import { ProtectedRoute, PublicOnlyRoute } from '../components/auth/AuthGuards'
 import LandingPage from '../pages/LandingPage'
 import NotFound from '../pages/NotFound'
 import { apiClient } from '../services/api'
-import axios from 'axios'
 
 vi.mock('../services/api', () => {
   return {

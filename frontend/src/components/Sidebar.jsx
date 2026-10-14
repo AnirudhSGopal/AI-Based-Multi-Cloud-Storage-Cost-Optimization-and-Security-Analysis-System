@@ -48,7 +48,6 @@ function LogoutButton() {
 
 export default function Sidebar() {
   const { alerts, dismissedAlerts } = useCloudStore()
-  const { user } = useAuthStore()
   const activeAlerts = alerts.filter(a => !dismissedAlerts.includes(a.id))
   const criticalCount = activeAlerts.filter(a => a.type === 'critical').length
 
