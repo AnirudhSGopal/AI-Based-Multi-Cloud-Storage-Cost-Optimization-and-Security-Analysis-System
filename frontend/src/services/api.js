@@ -45,6 +45,7 @@ async function performSingleRefresh() {
   if (newRefreshToken) {
     localStorage.setItem('refresh_token', newRefreshToken)
   }
+  localStorage.setItem('cloudopt_last_refresh', Date.now().toString())
   return access_token
 }
 
@@ -54,15 +55,24 @@ async function requestTokenRefresh() {
   }
 
   activeRefreshPromise = (async () => {
-    const tokenBefore = localStorage.getItem('auth_token')
+    const refreshTokenBefore = localStorage.getItem('refresh_token')
 
     if (typeof navigator !== 'undefined' && navigator.locks?.request) {
       return navigator.locks.request('cloudopt_token_refresh', async () => {
-        const tokenNow = localStorage.getItem('auth_token')
-        if (tokenNow && tokenNow !== tokenBefore) {
-          return tokenNow
+        const currentRefreshToken = localStorage.getItem('refresh_token')
+        const currentAccessToken = localStorage.getItem('auth_token')
+        const lastRefresh = Number(localStorage.getItem('cloudopt_last_refresh') || 0)
+
+        if (
+          currentAccessToken &&
+          (currentRefreshToken !== refreshTokenBefore || Date.now() - lastRefresh < 5000)
+        ) {
+          return currentAccessToken
         }
-        return performSingleRefresh()
+
+        const token = await performSingleRefresh()
+        localStorage.setItem('cloudopt_last_refresh', Date.now().toString())
+        return token
       })
     }
 

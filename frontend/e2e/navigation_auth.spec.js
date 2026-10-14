@@ -116,15 +116,11 @@ test.describe('Navigation and Authentication Flow', () => {
     await page1.evaluate(async () => {
       const authModule = await import('/src/store/authStore.js')
       authModule.default.getState().logout(true)
+      window.location.replace('/')
     })
-    await page1.goto('/')
     await expect(page1).toHaveURL('/')
 
-    // Tab 2 checks session or responds to storage/broadcast event
-    await page2.evaluate(async () => {
-      const authModule = await import('/src/store/authStore.js')
-      authModule.default.getState().checkSession()
-    })
+    // Tab 2 automatically responds to storage/broadcast event and redirects
     await expect(page2).toHaveURL('/')
 
     await page1.close()
@@ -190,6 +186,7 @@ test.describe('Navigation and Authentication Flow', () => {
       await authModule.default.getState().fetchMe()
     })
 
+    await expect(page).toHaveURL(/\/login\?returnTo=%2Fdashboard/)
     const token = await page.evaluate(() => localStorage.getItem('auth_token'))
     expect(token).toBeNull()
   })

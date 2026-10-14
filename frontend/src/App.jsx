@@ -90,7 +90,7 @@ function App() {
         channel = new BroadcastChannel('cloudopt_auth_channel')
         channel.onmessage = (event) => {
           if (event.data?.type === 'LOGOUT') {
-            useAuthStore.getState().logout(false)
+            useAuthStore.getState().checkSession()
           }
         }
       }
