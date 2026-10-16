@@ -199,10 +199,16 @@ class ProductionConfig(BaseConfig):
                     f"Missing required production environment variable: {variable}"
                 )
         if not cls.CORS_ORIGINS:
+            cls.CORS_ORIGINS = [
+                origin.strip()
+                for origin in os.getenv("CORS_ORIGINS", "").split(",")
+                if origin.strip()
+            ]
+        if not cls.CORS_ORIGINS:
             raise RuntimeError(
                 "Missing required production environment variable: CORS_ORIGINS"
             )
-        if "*" in cls.CORS_ORIGINS:
+        if "*" in cls.CORS_ORIGINS or os.environ.get("CORS_ORIGINS", "").strip() == "*":
             raise RuntimeError("CORS_ORIGINS must contain explicit origins, not *")
 config_map = {
     "development": DevelopmentConfig,

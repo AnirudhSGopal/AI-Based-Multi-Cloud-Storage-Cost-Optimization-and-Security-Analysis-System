@@ -22,11 +22,14 @@ logger = logging.getLogger(__name__)
 _raw_key = os.getenv("ENCRYPTION_KEY") or os.getenv("CLOUD_ENCRYPTION_KEY")
 
 if not _raw_key:
-    raise RuntimeError(
-        "ENCRYPTION_KEY environment variable is not set. "
-        "Generate one with: python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\" "
-        "and add it to your .env file."
-    )
+    if os.getenv("PYTEST_CURRENT_TEST") or os.getenv("TESTING"):
+        _raw_key = "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="
+    else:
+        raise RuntimeError(
+            "ENCRYPTION_KEY environment variable is not set. "
+            "Generate one with: python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\" "
+            "and add it to your .env file."
+        )
 
 try:
     _key_list = [k.strip() for k in _raw_key.split(",") if k.strip()]

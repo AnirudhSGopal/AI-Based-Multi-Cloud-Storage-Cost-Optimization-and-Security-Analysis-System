@@ -23,6 +23,13 @@ jobs:
 
   backend:
     runs-on: ubuntu-latest
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5432/cloudopt_test
+      CORS_ORIGINS: "http://localhost,http://127.0.0.1"
+      ENCRYPTION_KEY: "wOo8bnJqiY5BuYXhfanfrG4mM5iTe-WybWZ_OcMw4Zg="
+      SECRET_KEY: "ci-test-secret-key-for-backend-runs"
+      JWT_SECRET_KEY: "ci-test-jwt-secret-key-for-backend-runs"
+      REDIS_URL: "redis://localhost:6379/0"
     services:
       postgres:
         image: postgres:16
