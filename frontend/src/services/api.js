@@ -1,7 +1,15 @@
 import axios from 'axios'
 
+const DEFAULT_API_URL = import.meta.env.PROD
+  ? 'https://cloudopt-api.onrender.com'
+  : 'http://localhost:5000'
+
+export const API_BASE_URL = (
+  import.meta.env.VITE_API_BASE_URL || DEFAULT_API_URL
+).replace(/\/+$/, '')
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000',
+  baseURL: API_BASE_URL,
   timeout: 60000,
   headers: {
     'Content-Type': 'application/json',
@@ -27,7 +35,7 @@ async function performSingleRefresh() {
   }
 
   const response = await axios.post(
-    `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/v1/auth/refresh`,
+    `${API_BASE_URL}/api/v1/auth/refresh`,
     {},
     {
       headers: {
