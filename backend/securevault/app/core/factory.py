@@ -163,13 +163,24 @@ def create_app(config_name: str = "development") -> Flask:
     cors_origins = app.config["CORS_ORIGINS"]
     if "*" in cors_origins:
         raise RuntimeError("CORS_ORIGINS must contain explicit origins, not *")
+
+    import re
+    # Expand wildcard subdomains (e.g. https://*.vercel.app) to regex patterns for Flask-CORS
+    processed_origins = []
+    for origin in cors_origins:
+        if isinstance(origin, str) and origin.startswith("https://*."):
+            suffix = re.escape(origin[len("https://*."):])
+            processed_origins.append(re.compile(rf"^https://[a-zA-Z0-9_.-]+\.{suffix}$"))
+        else:
+            processed_origins.append(origin)
+
     cors.init_app(
         app,
         resources={r"/api/*": {
-            "origins": cors_origins,
+            "origins": processed_origins,
             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
             "allow_headers": ["Content-Type", "Authorization"],
-            "supports_credentials": bool(cors_origins),
+            "supports_credentials": bool(processed_origins),
             "max_age": 3600
         }}
     )
