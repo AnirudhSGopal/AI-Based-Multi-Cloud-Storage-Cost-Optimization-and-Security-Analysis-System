@@ -34,12 +34,10 @@ def seed_admin():
         user = User.query.filter_by(email=email).first()
 
         if user:
-            if user.role != RoleEnum.ADMIN:
-                user.role = RoleEnum.ADMIN
-                db.session.commit()
-                print(f"[OK] Updated existing user '{email}' to ADMIN role.")
-            else:
-                print(f"[OK] Admin user '{email}' already exists with ADMIN role.")
+            user.role = RoleEnum.ADMIN
+            user.password = password
+            db.session.commit()
+            print(f"[OK] Updated user '{email}' to ADMIN role and reset password from ADMIN_PASSWORD.")
         else:
             user = User(
                 username=username,
