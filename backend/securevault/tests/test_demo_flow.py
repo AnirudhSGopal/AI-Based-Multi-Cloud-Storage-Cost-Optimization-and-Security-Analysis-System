@@ -15,6 +15,7 @@ from app.core.extensions import db
 @pytest.fixture
 def app():
     app = create_app("testing")
+    app.config["ENABLE_DEMO_DATA"] = True
     with app.app_context():
         db.create_all()
     yield app
